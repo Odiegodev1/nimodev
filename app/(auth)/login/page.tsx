@@ -28,7 +28,7 @@ export default async function LoginPage() {
 const session =await auth()
 
 if(session){
-  return redirect("/")
+  return redirect("/dashboard")
 }
   return (
     <main className="flex min-h-screen w-full bg-white">

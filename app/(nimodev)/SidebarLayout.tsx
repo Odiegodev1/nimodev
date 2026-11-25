@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 const navItems = [
   {
     label: "Visão geral",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
   },
   {
@@ -21,11 +21,7 @@ const navItems = [
     href: "/dispositivo", // Ajuste aqui para a rota exata da sua tela
     icon: LaptopMinimal,
   },
-  {
-    label: "Configura NIMO",
-    href: "/nimo", // Ajuste aqui para a rota exata da sua tela
-    icon: Settings2,
-  },
+ 
   {
     label: "Integração",
     href: "/integracao", // Ajuste aqui para a rota exata da sua tela
