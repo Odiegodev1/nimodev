@@ -49,7 +49,7 @@ const router = useRouter()
   
       form.reset();
   
-      router.replace("/");
+      router.replace("/dashboard");
       router.refresh();
     } catch {
       toast.error("Não foi possível conectar ao servidor.");
