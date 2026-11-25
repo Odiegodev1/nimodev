@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// AUTENTICAÇÃO
+// ==========================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+enum NimoTheme {
+  ORIGINAL
+  OCEAN
+  LAVENDER
+  SUNSET
+  ROSE
+  ICE
+}
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  password      String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+
+  accounts Account[]
+  sessions Session[]
+  sites    MonitoredSite[]
+  nimoTheme NimoTheme @default(ORIGINAL)
+  devices  NimoDevice[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ==========================================
+// MONITORAMENTO DE SITES
+// ==========================================
+
+enum MonitorStatus {
+  UNKNOWN
+  ONLINE
+  OFFLINE
+}
+
+model MonitoredSite {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+
+  name String
+  url  String
+
+  status MonitorStatus @default(UNKNOWN)
+
+  httpStatus     Int?
+  responseTime   Int?
+  visitorsOnline Int?
+
+  lastCheckedAt DateTime?
+
+  // Controle de falhas consecutivas
+  consecutiveFailures Int       @default(0)
+  lastOnlineAt        DateTime?
+  lastOfflineAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  devices NimoDevice[]
+  alerts  Alert[]
+
+  @@unique([userId, url])
+  @@index([userId])
+  @@map("monitored_sites")
+}
+
+// ==========================================
+// ALERTAS E INCIDENTES
+// ==========================================
+
+enum AlertType {
+  SITE_DOWN
+  HTTP_404
+  HTTP_500
+  HTTP_502
+  HTTP_503
+  HTTP_504
+  HTTP_OTHER
+  TIMEOUT
+  CONNECTION_ERROR
+  SSL_ERROR
+}
+
+enum AlertSeverity {
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  RESOLVED
+}
+
+enum AlertSource {
+  UPTIME_MONITOR
+  TRACKING_SCRIPT
+  SERVER_INTEGRATION
+}
+
+model Alert {
+  id     String @id @default(cuid())
+  siteId String
+
+  type     AlertType
+  severity AlertSeverity
+  status   AlertStatus   @default(ACTIVE)
+  source   AlertSource
+
+  title   String
+  message String @db.Text
+
+  // Endereço afetado
+  url  String
+  path String?
+
+  // Informações da requisição
+  statusCode   Int?
+  responseTime Int?
+  method       String?
+
+  // Agrupamento de ocorrências
+  occurrences Int @default(1)
+
+  // Controle de leitura
+  readAt DateTime?
+
+  // Histórico do incidente
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  // Informações adicionais
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  site MonitoredSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId, status])
+  @@index([siteId, type, status])
+  @@index([siteId, readAt])
+  @@index([siteId, type, path])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("alerts")
+}
+
+// ==========================================
+// DISPOSITIVOS NIMO
+// ==========================================
+
+enum NimoDeviceStatus {
+  PENDING
+  ONLINE
+  OFFLINE
+}
+
+model NimoDevice {
+  id         String @id @default(cuid())
+  name       String @default("Meu NIMO")
+  hardwareId String @unique
+
+  // Nunca armazenar o segredo em texto puro
+  secretHash String
+
+  userId String?
+  siteId String?
+
+  status       NimoDeviceStatus @default(PENDING)
+  syncInterval Int              @default(60)
+
+  firmwareVersion String?
+  lastSeenAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  site MonitoredSite? @relation(fields: [siteId], references: [id], onDelete: SetNull)
+
+  pairingCodes NimoPairingCode[]
+
+  @@index([userId])
+  @@index([siteId])
+  @@map("nimo_devices")
+}
+
+model NimoPairingCode {
+  id       String @id @default(cuid())
+  deviceId String
+
+  codeHash  String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  device NimoDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@map("nimo_pairing_codes")
+}
